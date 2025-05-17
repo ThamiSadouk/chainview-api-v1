@@ -1,0 +1,17 @@
+# .air.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ."
+  bin = "tmp/server"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "migrations"]
+  exclude_file = ["*_test.go"]
+  delay = 1000 # in ms
+
+[log]
+  time = true
+
+[run]
+  cmd = "./tmp/server"
