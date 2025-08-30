@@ -3,9 +3,9 @@ POST {{host}}/signup
 Content-Type: application/json
 
 {
-  "name": "Alice",
-  "email": "alice@example.com",
-  "password": "alicepassword"
+  "username": "rere",
+  "email": "rer.sadouk@gmail.com",
+  "password": "passwordthami"
 }
 
 ### Login user
@@ -23,6 +23,11 @@ Content-Type: application/json
 
 ### Get list of users
 GET {{host}}/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### Get wallet details
+GET {{host}}/wallet?address=0xb5d85cbf7cb3ee0d56b3bb207d5fc4b82f43f511
 Content-Type: application/json
 Authorization: Bearer {{token}}
 

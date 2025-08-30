@@ -7,7 +7,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/rs/cors"
 	"golang.org/x/crypto/bcrypt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +22,7 @@ type User struct {
 	Email string `json:"email"`
 }
 
-var jwtKey = []byte("your_super_secret_key")
+var jwtKey = []byte("secret_key")
 var db *sql.DB
 
 func main() {
@@ -64,9 +66,17 @@ func main() {
 	// GET USERS
 	http.HandleFunc("/users", authMiddleware(getAllUsersHandler))
 
-	fmt.Println("Server listening on port 3000")
+	// GET WALLET DETAILS
+	http.HandleFunc("/wallet", authMiddleware(getWalletDetails))
 
-	err = http.ListenAndServe(":3000", nil)
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowCredentials: true,
+	})
+	handler := c.Handler(http.DefaultServeMux)
+	fmt.Println("Server listening on port 3000")
+	err = http.ListenAndServe(":3000", handler)
+
 	if err != nil {
 		log.Fatal("Server Error: ", err)
 	}
@@ -87,6 +97,36 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func getWalletDetails(w http.ResponseWriter, r *http.Request) {
+	address := r.URL.Query().Get("address")
+	if address == "" {
+		http.Error(w, "No address provided", http.StatusBadRequest)
+		return
+	}
+
+	// Get Balance from Etherscan
+	apiKey := os.Getenv("ETHERSCAN_API_KEY")
+	fmt.Println("API key", apiKey)
+	url := fmt.Sprintf("https://api.etherscan.io/v2/api?chainid=1&module=account&action=balance&address=%s&tag=latest&apikey=%s", address, apiKey)
+	//url := fmt.Sprintf("https://api.covalenthq.com/v1/1/address/%s/balances_v2/", address)
+	fmt.Println("Url Balance", url)
+
+	res, err := http.Get(url)
+	if err != nil {
+		http.Error(w, "Failed to fetch from EtherScan", http.StatusInternalServerError)
+		return
+	}
+
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		http.Error(w, "Failed reading response body", http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
@@ -110,12 +150,9 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	var exists int
 	err = db.QueryRow("SELECT COUNT(1) FROM chainview.users WHERE email = $1", cred.Email).Scan(&exists)
 	if err != nil {
-		fmt.Println("erreurr", err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println("exists", exists)
 
 	if exists > 0 {
 		http.Error(w, "Email already in use", http.StatusBadRequest)
